@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DTA-Wortvektoren</title>
+<style>
+:root {
+  --paper: #fcfcfa;
+  --ink: #2f2f2f;
+  --muted: #6b6b6b;
+  --rule: #e3e1dc;
+  --bar: #005aa1;
+  --bar-track: #eceae5;
+  --accent: #005aa1;
+  --serif: "Palatino Linotype", Palatino, "Book Antiqua", "Iowan Old Style", Georgia, serif;
+  --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1c1d1f;
+    --ink: #e4e2dd;
+    --muted: #a09d97;
+    --rule: #34363a;
+    --bar: #6fa9dc;
+    --bar-track: #2c2e31;
+    --accent: #8dbbe6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1c1d1f;
+  --ink: #e4e2dd;
+  --muted: #a09d97;
+  --rule: #34363a;
+  --bar: #6fa9dc;
+  --bar-track: #2c2e31;
+  --accent: #8dbbe6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--sans); }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+main { max-width: 42rem; margin: 0 auto; padding: 3rem 1rem 3rem; }
+h1 { font: 400 1.25rem/1.3 var(--serif); color: var(--muted); margin: 0 0 2.5rem; }
+a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 1px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+input {
+  width: 100%;
+  font: 400 2.25rem/1.25 var(--serif);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  border-radius: 0;
+  padding: .2rem 0 .4rem;
+  caret-color: var(--accent);
+}
+input::placeholder { color: var(--muted); opacity: .6; }
+input:focus { outline: none; border-bottom-color: var(--accent); box-shadow: 0 1px 0 var(--accent); }
+.hint { color: var(--muted); margin: .75rem 0 0; }
+.hint a, .word a, .message a {
+  color: var(--ink);
+  font-family: var(--serif);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 1px;
+  text-underline-offset: .2em;
+}
+.hint a { font-size: 1.05rem; white-space: nowrap; }
+.hint a:hover, .word a:hover, .message a:hover { text-decoration-color: var(--accent); }
+#output { margin-top: 2.75rem; min-height: 20rem; }
+.message { color: var(--muted); }
+.message .term { color: var(--ink); font-family: var(--serif); font-size: 1.05rem; }
+.result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.result-head h2 { font: 400 1.5rem/1.3 var(--serif); margin: 0; }
+.result-head .op { color: var(--muted); padding: 0 .3em; }
+.count { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums lining-nums; }
+ol { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+li {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(7rem, 14rem) 1fr 2.8rem;
+  align-items: center;
+  gap: .75rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.rank, .value { color: var(--muted); font-size: .9rem; text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+.word { font-family: var(--serif); font-size: 1.15rem; overflow-wrap: anywhere; }
+.bar { height: 5px; background: var(--bar-track); position: relative; }
+.bar span { position: absolute; inset: 0 auto 0 0; background: var(--bar); }
+footer { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .85rem; line-height: 1.55; }
+footer p { margin: 0 0 .5rem; }
+@media (max-width: 560px) {
+  main { padding-top: 1.75rem; }
+  h1 { margin-bottom: 1.75rem; }
+  input { font-size: 1.9rem; }
+  li { grid-template-columns: 1.4rem minmax(5rem, 1fr) 4.5rem 2.6rem; gap: .5rem; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Wortvektoren aus dem Deutschen Textarchiv</h1>
+  <form id="form" autocomplete="off">
+    <label class="visually-hidden" for="query">Wort oder Rechnung</label>
+    <input type="text" id="query" spellcheck="false" autocapitalize="none" enterkeyhint="search" placeholder="kaffee">
+    <p class="hint" id="hint"></p>
+  </form>
+  <section id="output" aria-live="polite"><p class="message">Das Modell wird geladen …</p></section>
+  <footer>
+    <p>Gib ein Wort ein, dann siehst du die Wörter, die im Deutschen Textarchiv in ähnlichen Zusammenhängen stehen. Mit + und − rechnest du mit den Vektoren: <i>könig − mann + frau</i> sucht das Wort, das zu <i>frau</i> steht wie <i>könig</i> zu <i>mann</i>. Die Zahl ist die Kosinus-Ähnlichkeit, 1 heißt gleiche Richtung, 0 kein Zusammenhang.</p>
+    <p>word2vec (Skip-gram, 300 Dimensionen, Fenster 5 Wörter), trainiert auf allen Texten des Deutschen Textarchivs (Stand 10.&nbsp;2.&nbsp;2026, 165,7&nbsp;Mio. Wörter). Enthalten sind die <span id="size">40.000</span> häufigsten Wörter, kleingeschrieben, ſ als s. Texte: Deutsches Textarchiv, BBAW, CC BY-SA 4.0. KI in den Geisteswissenschaften, Universität Passau, WiSe 2026/27.</p>
+  </footer>
+</main>
+
+<script type="application/json" id="data-meta">/*META*/</script>
+<script type="text/plain" id="data-vectors">/*VECTORS*/</script>
+<script>
+"use strict";
+
+const EXAMPLES = ["kaffee", "kutsche", "cholera", "witz", "könig - mann + frau", "paris - frankreich + england", "ging - gehen + schreiben"];
+const NEIGHBOURS = 15;
+const MINUS = "−";
+const number = new Intl.NumberFormat("de-DE");
+const cosine = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+let model = null;
+
+function loadModel() {
+  const meta = JSON.parse(document.getElementById("data-meta").textContent);
+  const binary = atob(document.getElementById("data-vectors").textContent.trim());
+  const dims = meta.dims;
+  const size = meta.words.length;
+  const vectors = new Float32Array(size * dims);
+  for (let w = 0; w < size; w++) {
+    const offset = w * dims;
+    let norm = 0;
+    for (let d = 0; d < dims; d++) {
+      const value = (binary.charCodeAt(offset + d) << 24) >> 24;
+      vectors[offset + d] = value;
+      norm += value * value;
+    }
+    norm = Math.sqrt(norm);
+    for (let d = 0; d < dims; d++) vectors[offset + d] /= norm;
+  }
+  model = { words: meta.words, counts: meta.counts, dims, size, vectors, index: new Map(meta.words.map((w, i) => [w, i])) };
+  document.getElementById("size").textContent = number.format(size);
+}
+
+function normalizeWord(text) {
+  return text.trim().toLowerCase().replace(/ſ/g, "s");
+}
+
+function parse(text) {
+  const terms = [];
+  const pattern = /([+\-−–]?)\s*([^\s+\-−–]+)/g;
+  let match;
+  while ((match = pattern.exec(text))) {
+    terms.push({ sign: match[1] && match[1] !== "+" ? -1 : 1, word: normalizeWord(match[2]) });
+  }
+  return terms;
+}
+
+function nearest(terms, ids) {
+  const { dims, size, vectors } = model;
+  const query = new Float32Array(dims);
+  terms.forEach((term, t) => {
+    const offset = ids[t] * dims;
+    for (let d = 0; d < dims; d++) query[d] += term.sign * vectors[offset + d];
+  });
+  const scores = new Float32Array(size);
+  let norm = 0;
+  for (let d = 0; d < dims; d++) norm += query[d] * query[d];
+  norm = Math.sqrt(norm) || 1;
+  for (let w = 0; w < size; w++) {
+    const offset = w * dims;
+    let sum = 0;
+    for (let d = 0; d < dims; d++) sum += vectors[offset + d] * query[d];
+    scores[w] = sum / norm;
+  }
+  for (const id of ids) scores[id] = -Infinity;
+  const best = [];
+  for (let w = 0; w < size; w++) {
+    if (best.length < NEIGHBOURS || scores[w] > scores[best[best.length - 1]]) {
+      best.push(w);
+      best.sort((a, b) => scores[b] - scores[a]);
+      if (best.length > NEIGHBOURS) best.pop();
+    }
+  }
+  return best.map(w => ({ word: model.words[w], score: scores[w] }));
+}
+
+function editDistance(a, b, limit) {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      best = Math.min(best, current[j]);
+    }
+    if (best > limit) return limit + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function similarSpellings(word) {
+  const found = [];
+  model.words.forEach((candidate, i) => {
+    const distance = editDistance(word, candidate, 2);
+    if (distance <= 2) found.push({ candidate, distance, i });
+  });
+  found.sort((a, b) => a.distance - b.distance || a.i - b.i);
+  return found.slice(0, 6).map(f => f.candidate);
+}
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of children.flat(Infinity)) {
+    if (child === null || child === undefined || child === false) continue;
+    node.append(child instanceof Node ? child : document.createTextNode(child));
+  }
+  return node;
+}
+
+function pretty(text) {
+  return text.replace(/\s*-\s*/g, " " + MINUS + " ").replace(/\s*\+\s*/g, " + ").trim();
+}
+
+function queryLink(text) {
+  return el("a", { href: "#" + encodeURIComponent(text) }, pretty(text));
+}
+
+function listOf(words, joiner) {
+  return words.map((w, i) => [i ? joiner : null, queryLink(w)]);
+}
+
+function unknown(words) {
+  return words.map(word => {
+    const suggestions = similarSpellings(word);
+    return el("p", { class: "message" },
+      el("span", { class: "term" }, word), " kommt unter den häufigsten Wörtern nicht vor.",
+      suggestions.length ? [" Ähnlich geschrieben: ", listOf(suggestions, ", "), "."] : null);
+  });
+}
+
+function heading(terms, ids) {
+  const title = el("h2", {}, terms.map((t, i) => [
+    i || t.sign < 0 ? el("span", { class: "op" }, t.sign < 0 ? MINUS : "+") : null, t.word]));
+  const count = terms.length === 1 ? el("span", { class: "count" }, number.format(model.counts[ids[0]]) + " Belege") : el("span", { class: "count" }, "Kosinus");
+  return el("div", { class: "result-head" }, title, count);
+}
+
+function results(entries) {
+  return el("ol", {}, entries.map((entry, i) => el("li", {},
+    el("span", { class: "rank" }, String(i + 1)),
+    el("span", { class: "word" }, queryLink(entry.word)),
+    el("span", { class: "bar", "aria-hidden": "true" }, el("span", { style: `width:${(Math.max(0, entry.score) * 100).toFixed(1)}%` })),
+    el("span", { class: "value" }, cosine.format(entry.score)))));
+}
+
+function render(text) {
+  const output = document.getElementById("output");
+  const terms = parse(text);
+  if (!terms.length) { output.replaceChildren(); return; }
+  const missing = terms.map(t => t.word).filter(w => !model.index.has(w));
+  if (missing.length) { output.replaceChildren(...unknown([...new Set(missing)])); return; }
+  const ids = terms.map(t => model.index.get(t.word));
+  output.replaceChildren(heading(terms, ids), results(nearest(terms, ids)));
+}
+
+function fromHash() {
+  const text = decodeURIComponent(location.hash.slice(1));
+  document.getElementById("query").value = pretty(text);
+  render(text);
+}
+
+let typingTimer = 0;
+document.getElementById("query").addEventListener("input", event => {
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => {
+    const text = event.target.value;
+    history.replaceState(null, "", "#" + encodeURIComponent(text.trim()));
+    render(text);
+  }, 250);
+});
+
+document.getElementById("form").addEventListener("submit", event => {
+  event.preventDefault();
+  clearTimeout(typingTimer);
+  const text = document.getElementById("query").value;
+  history.replaceState(null, "", "#" + encodeURIComponent(text.trim()));
+  render(text);
+});
+
+window.addEventListener("hashchange", fromHash);
+
+document.getElementById("hint").append(...["Ein Wort eingeben oder mit + und − rechnen, zum Beispiel ", listOf(EXAMPLES, ", "), "."].flat(Infinity).filter(Boolean));
+
+requestAnimationFrame(() => setTimeout(() => {
+  loadModel();
+  if (!location.hash) history.replaceState(null, "", "#kaffee");
+  fromHash();
+  if (!matchMedia("(pointer: coarse)").matches) document.getElementById("query").focus();
+}, 0));
+</script>
+</body>
+</html>
